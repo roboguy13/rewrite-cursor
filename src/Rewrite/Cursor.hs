@@ -36,6 +36,8 @@ topCursor :: Cursor
 topCursor = Cursor []
 
 -- NOTE: Do not export the data constructor
+-- TODO: Should this also keep track of the current cursor (as a 'Maybe
+-- Cursor')?
 data Cursored a = Cursored (Tree a) (Set Cursor)
 
 newtype CursoredM a r = CursoredM (State (Cursored a) r)
@@ -54,6 +56,18 @@ runCursored (Cursored x _) = x
 
 runCursoredM_ :: CursoredM a r -> Tree a -> Tree a
 runCursoredM_ (CursoredM cm) = runCursored . execState cm . mkCursored
+
+-- | Save and restore state
+delimitState :: MonadState s m => m r -> m (s, r)
+delimitState m = do
+  oldState <- get
+
+  r <- m
+  modifiedState <- get
+
+  put oldState
+  return (modifiedState, r)
+
 
 simpleRewriteAt_ :: (Tree a -> Tree a) -> Cursor -> CursoredM a (Maybe ())
 simpleRewriteAt_ r cursor = do
@@ -77,41 +91,63 @@ simpleRewriteAt_ r cursor = do
           R -> go crs right
       go _ _ = Nothing
 
+-- NOTE: Do not export
+setCursoredExpr :: Tree a -> CursoredM a ()
+setCursoredExpr x = do
+  Cursored _ validCursors <- get
+  put (Cursored x validCursors)
+
+cursorDescend :: (Tree a -> Maybe (Tree a)) -> CursoredM a [Cursor]
+cursorDescend tr = cursorDescend' tr topCursor
+
+cursorDescend' :: (Tree a -> Maybe (Tree a)) -> Cursor -> CursoredM a [Cursor]
+cursorDescend' tr cursorSoFar = cursorDescendM go cursorSoFar
+  where
+    go crumb = do
+      c@(Cursored x validCursors) <- get
+      let x'_maybe = tr x
+
+      setCursoredExpr (fromMaybe x x'_maybe)
+
+      return [addCrumb cursorSoFar crumb]
+
 -- | Apply (non-recursively) to all immediate children
-cursorDescend :: (Tree a -> Maybe (Tree a)) -> Cursor -> CursoredM a [Cursor]
-cursorDescend tr cursorSoFar = do
+cursorDescendM :: Monoid r => (Crumb -> CursoredM a r) -> Cursor -> CursoredM a r
+cursorDescendM tr cursorSoFar = do
   c <- get
   case c of
-    Cursored Tip _ -> return []
-    Cursored (Bin left x right) validCursors -> do
-      let trLeft_maybe  = tr left
-          trRight_maybe = tr right
+    Cursored Tip _ -> return mempty
+    Cursored (Bin left x right) _validCursors -> do
 
-          trLeft_defaulted  = fromMaybe left trLeft_maybe
-          trRight_defaulted = fromMaybe right trRight_maybe
+      (Cursored left' leftValidCursors, leftR) <- delimitState $ do
+        setCursoredExpr left
+        tr L
 
-          cursors =
-            catMaybes
-              [fmap (const (addCrumb cursorSoFar L)) trLeft_maybe
-              ,fmap (const (addCrumb cursorSoFar R)) trRight_maybe
-              ]
-          cursorsDoNotClobber c = all (`doesNotClobber` c) cursors
-      put (Cursored (Bin trLeft_defaulted
-                         x
-                         trRight_defaulted)
-                    (S.fromList cursors `S.union` S.filter cursorsDoNotClobber validCursors))
-      return cursors
+      (Cursored right' rightValidCursors, rightR) <- delimitState $ do
+        setCursoredExpr right
+        tr R
+
+      let
+            -- TODO: Does this need to be checked for clobbering? Probably
+            -- not.
+          validCursors =
+            S.map (`addCrumb` L) leftValidCursors `S.union` S.map (`addCrumb` R) rightValidCursors
+
+      put (Cursored (Bin left' x right')
+                    validCursors)
+
+      return (leftR <> rightR)
 
 -- | Apply recursively using a bottom-up traversal pattern
 cursorTransform :: (Tree a -> Maybe (Tree a)) -> CursoredM a [Cursor]
 cursorTransform tr = do
-  c0 <- get
-  go topCursor c0
+  go topCursor
   where
-    go cursorSoFar c@(Cursored _ validCursors) = do
-      cursors <- cursorDescend tr cursorSoFar
+    go cursorSoFar = do
+      cursors <- cursorDescendM (\crumb -> go (addCrumb cursorSoFar crumb)) cursorSoFar
+
       c'@(Cursored x validCursors') <- get
-      -- let c'@(Cursored x validCursors', cursors) = cursorDescend tr cursorSoFar c
+
       let x'_maybe = tr x
           validCursors'' =
             case x'_maybe of
