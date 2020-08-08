@@ -34,12 +34,6 @@ newtype Cursor = Cursor [Crumb] deriving (Eq, Ord, Show)
 cursorCrumbs :: Cursor -> [Crumb]
 cursorCrumbs (Cursor cs) = reverse cs
 
--- TODO: Does 'moveCursorUp' make sense conceptually? If so, how do we know
--- that it is a valid cursor?
-
--- moveCursorUp :: Cursor -> Cursor
--- moveCursorUp (Cursor xs) = Cursor (init xs)
-
 -- NOTE: Do not export
 addCrumb :: Cursor -> Crumb -> Cursor
 addCrumb (Cursor cs) c = Cursor (c:cs)
@@ -68,6 +62,21 @@ runCursored (Cursored x _) = x
 
 runCursoredM_ :: Tree a -> CursoredM a r -> Tree a
 runCursoredM_ t (CursoredM cm) = runCursored . execState cm $ mkCursored t
+
+-- TODO: Does this make sense?
+cursorUpLevel :: Cursor -> CursoredM a Cursor
+cursorUpLevel (Cursor []) = return topCursor
+cursorUpLevel c@(Cursor (_:xs)) = do
+  Cursored t validCursors <- get
+  if c `S.member` validCursors
+    then do
+      let c' = Cursor xs
+      put (Cursored t (S.insert c' validCursors))
+      return c'
+    else
+      -- We were given an invalid cursor, so we just give back an invalid
+      -- cursor
+      return c
 
 -- | Save and restore state
 delimitState :: MonadState s m => m r -> m (s, r)

@@ -51,7 +51,10 @@ main = do
 
             traceM (show c)
 
-            simpleRewriteAt_ (Data.transform times100) c
+            c' <- cursorUpLevel c
+            traceM (show c')
+
+            simpleRewriteAt_ (Data.transform times100) c'
 
   printTree t
 
