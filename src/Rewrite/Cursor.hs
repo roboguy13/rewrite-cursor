@@ -63,14 +63,16 @@ runCursored (Cursored x _) = x
 runCursoredM_ :: Tree a -> CursoredM a r -> Tree a
 runCursoredM_ t (CursoredM cm) = runCursored . execState cm $ mkCursored t
 
--- TODO: Does this make sense?
 cursorUpLevel :: Cursor -> CursoredM a Cursor
-cursorUpLevel (Cursor []) = return topCursor
-cursorUpLevel c@(Cursor (_:xs)) = do
+cursorUpLevel = cursorUpLevelN 1
+
+-- TODO: Does this make sense?
+cursorUpLevelN :: Int -> Cursor -> CursoredM a Cursor
+cursorUpLevelN n c@(Cursor xs) = do
   Cursored t validCursors <- get
   if c `S.member` validCursors
     then do
-      let c' = Cursor xs
+      let c' = Cursor (drop n xs)
       put (Cursored t (S.insert c' validCursors))
       return c'
     else

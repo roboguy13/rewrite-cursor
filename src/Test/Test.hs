@@ -51,7 +51,7 @@ main = do
 
             traceM (show c)
 
-            c' <- cursorUpLevel c
+            c' <- cursorUpLevelN 2 c
             traceM (show c')
 
             simpleRewriteAt_ (Data.transform times100) c'
