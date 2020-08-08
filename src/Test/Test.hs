@@ -1,10 +1,16 @@
+{-# LANGUAGE DeriveDataTypeable #-}
+
 module Test.Test where
 
 import           Rewrite.Cursor
 
+import           Data.Data
+
 import qualified Data.Generics.Uniplate.DataOnly as Data
 
 import Debug.Trace
+
+data Tree a = Tip | Bin (Tree a) a (Tree a) deriving (Show, Data)
 
 buildTree :: [a] -> Tree a
 buildTree xs0 = go (length xs0) xs0
@@ -44,8 +50,8 @@ times100 t = t
 
 main :: IO ()
 main = do
-  let t = runCursoredM_ testTree $ do
-            c_maybe <- rewriteOneTD rewrite7
+  let Just t = runCursoredM $ do
+            (t', c_maybe) <- rewriteOneTD rewrite7 testTree
 
             let Just c = c_maybe
 
@@ -54,7 +60,7 @@ main = do
             -- c' <- cursorUpLevel c
             -- traceM (show c')
 
-            simpleRewriteAt_ (Data.transform times100) c
+            simpleRewriteAt_ (Data.transform times100) c t'
 
   printTree t
 
