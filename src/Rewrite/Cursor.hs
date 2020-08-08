@@ -91,13 +91,17 @@ delimitState m = do
   put oldState
   return (modifiedState, r)
 
+crumbApply :: Applicative f => f (Tree a) -> Crumb -> (Tree a -> f (Tree a)) -> Tree a -> f (Tree a)
+crumbApply z _ _ Tip = z
+crumbApply _ L f (Bin left x right) = Bin <$> f left <*> pure x <*> pure right
+crumbApply _ R f (Bin left x right) = Bin <$> pure left <*> pure x <*> f right
 
 simpleRewriteAt_ :: (Tree a -> Tree a) -> Cursor -> CursoredM a (Maybe ())
 simpleRewriteAt_ r cursor = do
   Cursored x0 validCursors <- get
   if cursor `S.member` validCursors
     then do
-      let validCursors' = S.filter (cursor `doesNotClobber`) validCursors
+      let validCursors' = S.insert cursor $ S.filter (cursor `doesNotClobber`) validCursors
           newCursored_maybe = Cursored <$> go (cursorCrumbs cursor) x0 <*> pure validCursors'
 
       putMaybe newCursored_maybe
@@ -107,12 +111,8 @@ simpleRewriteAt_ r cursor = do
     else return Nothing
 
     where
-      go [] x = Just $ r x
-      go (cr:crs) (Bin left x right) =
-        case cr of
-          L -> Bin <$> go crs left <*> pure x <*> pure right
-          R -> Bin <$> pure left <*> pure x <*> go crs right
-      go _ _ = Nothing
+      go (cr:crs) x = crumbApply Nothing cr (go crs) x
+      go []       x = Just $ r x
 
 goLeft :: (Cursor -> CursoredM a r) -> Cursor -> Tree a -> a -> Tree a -> CursoredM a r
 goLeft f cursorSoFar left x right = do
