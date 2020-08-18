@@ -48,19 +48,25 @@ times100 :: Tree Int -> Tree Int
 times100 (Bin left x right) = Bin left (x*100) right
 times100 t = t
 
+negateBin :: Tree Int -> Tree Int
+negateBin Tip = Tip
+negateBin (Bin left x right) = Bin left (negate x) right
+
 main :: IO ()
 main = do
-  let Just t = runCursoredM $ do
-            (t', c_maybe) <- rewriteOneTD rewrite7 testTree
+  let t = execCursoredM testTree $ do
+            c_maybe <- rewriteOneTD rewrite7
 
             let Just c = c_maybe
 
             traceM (show c)
 
-            -- c' <- cursorUpLevel c
-            -- traceM (show c')
+            c' <- cursorUpLevel c
+            traceM (show c')
 
-            simpleRewriteAt_ (Data.transform times100) c t'
+            simpleRewriteAt_ (Data.transform negateBin) c
+            simpleRewriteAt_ (Data.transform times100) c
+
 
   printTree t
 
