@@ -37,9 +37,6 @@ showTree = unlines . go
 printTree :: Show a => Tree a -> IO ()
 printTree = putStrLn . showTree
 
-testTree :: Tree Int
-testTree = buildTree [0..25]
-
 rewrite7 :: Tree Int -> Maybe (Tree Int)
 rewrite7 (Bin left 7 right) = Just $ Bin left (-1) right
 rewrite7 _ = Nothing
@@ -56,23 +53,28 @@ times100_maybe :: Tree Int -> Maybe (Tree Int)
 times100_maybe Tip = Nothing
 times100_maybe (Bin left x right) = Just $ Bin left (x*100) right
 
+
+testTree :: Tree Int
+testTree = buildTree [0..25]
+
+testTree' :: Tree Int
+testTree' =
+  execCursoredM testTree $ do
+    c_maybe <- rewriteOneTD rewrite7
+
+    let Just c = c_maybe
+
+    traceM (show c)
+
+    c' <- cursorUpLevel c
+    traceM (show c')
+
+    -- cursorDescend' times100_maybe c
+    simpleRewriteAt (Data.transform times100) c
+    simpleRewriteAt (Data.transform negateBin) c'
+
+
 main :: IO ()
 main = do
-  let t = execCursoredM testTree $ do
-            c_maybe <- rewriteOneTD rewrite7
-
-            let Just c = c_maybe
-
-            traceM (show c)
-
-            c' <- cursorUpLevel c
-            traceM (show c')
-
-            -- cursorDescend' times100_maybe c
-            simpleRewriteAt (Data.transform times100) c
-            simpleRewriteAt (Data.transform negateBin) c'
-
-
-  printTree t
-
+  printTree testTree'
 

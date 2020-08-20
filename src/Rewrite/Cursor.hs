@@ -76,12 +76,6 @@ newtype Cursor = Cursor Int deriving (Eq, Ord, Show)
 getCrumbs :: CrumbList -> [Crumb]
 getCrumbs (CrumbList crs) = reverse crs
 
--- cursorCrumbList :: Cursor -> CrumbList
--- cursorCrumbList (Cursor c) = c
-
--- cursorCrumbs :: Cursor -> [Crumb]
--- cursorCrumbs = getCrumbs . cursorCrumbList
-
 -- NOTE: Do not export
 addCrumb :: CrumbList -> Crumb -> CrumbList
 addCrumb (CrumbList cs) c = CrumbList (cs ++ [c]) --CrumbList (c:cs)
