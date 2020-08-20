@@ -52,6 +52,10 @@ negateBin :: Tree Int -> Tree Int
 negateBin Tip = Tip
 negateBin (Bin left x right) = Bin left (negate x) right
 
+times100_maybe :: Tree Int -> Maybe (Tree Int)
+times100_maybe Tip = Nothing
+times100_maybe (Bin left x right) = Just $ Bin left (x*100) right
+
 main :: IO ()
 main = do
   let t = execCursoredM testTree $ do
@@ -64,8 +68,9 @@ main = do
             c' <- cursorUpLevel c
             traceM (show c')
 
-            simpleRewriteAt_ (Data.transform negateBin) c
-            simpleRewriteAt_ (Data.transform times100) c
+            -- cursorDescend' times100_maybe c
+            simpleRewriteAt (Data.transform times100) c
+            simpleRewriteAt (Data.transform negateBin) c'
 
 
   printTree t
